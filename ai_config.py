@@ -1,4 +1,5 @@
-OPENAI_API_KEY = "your_openai_api_key"
+BASE_URL = "https://openrouter.ai/api/v1"
+OPENAI_API_KEY = "your_openai_api_key_here"
 # 模型配置
 MODEL_CONFIG = {
     'translation': {

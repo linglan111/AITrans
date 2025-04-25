@@ -1,6 +1,6 @@
 from celery import Celery
 import time
-from trans import translate_zh_to_en, translate_en_to_zh, summarize_text
+from src.trans import translate_zh_to_en, translate_en_to_zh, summarize_text
 from config import REDIS_URL
 
 # 初始化Celery

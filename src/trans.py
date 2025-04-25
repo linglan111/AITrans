@@ -2,13 +2,13 @@ import time
 import random
 import traceback
 
-from ai_config import OPENAI_API_KEY, MODEL_CONFIG
+from ai_config import OPENAI_API_KEY, MODEL_CONFIG, BASE_URL
 from openai import OpenAI
 import os
 
 # 初始化AI模型client
 client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
+    base_url=BASE_URL,
     api_key=OPENAI_API_KEY
 )
 
