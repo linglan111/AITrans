@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI功能演示</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 40px;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .output {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            min-height: 50px;
+        }
+        .loading {
+            color: #888;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI 功能演示</h1>
+
+    <div class="section">
+        <h2>1. 中译英</h2>
+        <textarea id="zhText" placeholder="请输入中文...">你好，我是AI助手，很高兴为您服务。</textarea>
+        <div>
+            <button onclick="callFunction('translate_zh_to_en', 'zhText', 'zhEnOutput', false)">同步翻译</button>
+            <button onclick="callFunction('translate_zh_to_en', 'zhText', 'zhEnOutput', true)">异步翻译</button>
+            <button onclick="streamFunction('translate_zh_to_en', 'zhText', 'zhEnOutput')">流式翻译</button>
+            <button onclick="sseFunction('translate_zh_to_en', 'zhText', 'zhEnOutput')">SSE流式翻译</button>
+        </div>
+        <div id="zhEnOutput" class="output">翻译结果将显示在这里...</div>
+    </div>
+
+    <div class="section">
+        <h2>2. 英译中</h2>
+        <textarea id="enText" placeholder="请输入英文...">Hello, I am an AI assistant, happy to help you.</textarea>
+        <div>
+            <button onclick="callFunction('translate_en_to_zh', 'enText', 'enZhOutput', false)">同步翻译</button>
+            <button onclick="callFunction('translate_en_to_zh', 'enText', 'enZhOutput', true)">异步翻译</button>
+            <button onclick="streamFunction('translate_en_to_zh', 'enText', 'enZhOutput')">流式翻译</button>
+            <button onclick="sseFunction('translate_en_to_zh', 'enText', 'enZhOutput')">SSE流式翻译</button>
+        </div>
+        <div id="enZhOutput" class="output">翻译结果将显示在这里...</div>
+    </div>
+
+    <div class="section">
+        <h2>3. 文本总结</h2>
+        <textarea id="summaryText" placeholder="请输入要总结的文本...">人工智能(AI)是一个广阔的研究领域，目标是创建能够模拟人类智能的机器和系统。它包括机器学习、自然语言处理、计算机视觉、专家系统等多个子领域。近年来，深度学习的进步推动了AI的快速发展，使其在图像识别、语言翻译、自动驾驶等领域取得了突破性进展。尽管AI有望解决许多复杂问题，但也带来了伦理和安全方面的挑战，如隐私保护、算法偏见和自动化对就业的影响等。</textarea>
+        <div>
+            <button onclick="callFunction('summarize', 'summaryText', 'summaryOutput', false)">同步总结</button>
+            <button onclick="callFunction('summarize', 'summaryText', 'summaryOutput', true)">异步总结</button>
+            <button onclick="streamFunction('summarize', 'summaryText', 'summaryOutput')">流式总结</button>
+            <button onclick="sseFunction('summarize', 'summaryText', 'summaryOutput')">SSE流式总结</button>
+        </div>
+        <div id="summaryOutput" class="output">总结结果将显示在这里...</div>
+    </div>
+
+    <script>
+        // 同步/异步调用
+        async function callFunction(functionId, inputId, outputId, isAsync) {
+            const text = document.getElementById(inputId).value;
+            const outputElement = document.getElementById(outputId);
+
+            outputElement.innerHTML = '<span class="loading">处理中，请稍候...</span>';
+
+            try {
+                let response, result;
+
+                if (isAsync) {
+                    // 异步调用
+                    response = await fetch(`/api/async/${functionId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text })
+                    });
+
+                    const data = await response.json();
+                    if (!data.success) {
+                        throw new Error(data.message);
+                    }
+
+                    const taskId = data.task_id;
+                    outputElement.innerHTML = '<span class="loading">任务已提交，正在等待结果...</span>';
+
+                    // 轮询获取结果
+                    await pollTaskResult(taskId, outputElement);
+                    return;
+                } else {
+                    // 同步调用
+                    response = await fetch(`/api/function/${functionId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text })
+                    });
+
+                    const data = await response.json();
+                    if (!data.success) {
+                        throw new Error(data.message);
+                    }
+
+                    result = data.result;
+                }
+
+                outputElement.textContent = result;
+            } catch (error) {
+                outputElement.innerHTML = `<span style="color: red;">错误：${error.message}</span>`;
+            }
+        }
+
+        // 轮询任务结果
+        async function pollTaskResult(taskId, outputElement) {
+            let attempts = 0;
+            const maxAttempts = 30; // 最多轮询30次
+
+            const poll = async () => {
+                if (attempts >= maxAttempts) {
+                    outputElement.innerHTML = '<span style="color: red;">获取结果超时</span>';
+                    return;
+                }
+
+                attempts++;
+
+                try {
+                    const response = await fetch(`/api/tasks/${taskId}`);
+                    const data = await response.json();
+
+                    if (data.status === 'pending') {
+                        outputElement.innerHTML = `<span class="loading">正在处理中 (${attempts})...</span>`;
+                        setTimeout(poll, 1000); // 1秒后再次轮询
+                    } else if (data.status === 'completed') {
+                        outputElement.textContent = data.result;
+                    } else {
+                        outputElement.innerHTML = `<span style="color: red;">任务失败：${data.result}</span>`;
+                    }
+                } catch (error) {
+                    outputElement.innerHTML = `<span style="color: red;">轮询错误：${error.message}</span>`;
+                }
+            };
+
+            await poll();
+        }
+
+        // 流式调用 (chunked response)
+        async function streamFunction(functionId, inputId, outputId) {
+            const text = document.getElementById(inputId).value;
+            const outputElement = document.getElementById(outputId);
+
+            outputElement.innerHTML = '<span class="loading">开始处理...</span>';
+
+            try {
+                const response = await fetch(`/api/stream/${functionId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let result = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.substring(6));
+                                if (data.done) {
+                                    // 流式传输完成
+                                    break;
+                                } else if (data.chunk) {
+                                    result = data.chunk;
+                                    outputElement.textContent = result;
+                                }
+                            } catch (e) {
+                                // 解析错误，忽略
+                            }
+                        }
+                    }
+                }
+
+                if (!result) {
+                    outputElement.innerHTML = '<span style="color: red;">未收到有效结果</span>';
+                }
+            } catch (error) {
+                outputElement.innerHTML = `<span style="color: red;">错误：${error.message}</span>`;
+            }
+        }
+
+        // SSE流式调用
+        function sseFunction(functionId, inputId, outputId) {
+            const text = document.getElementById(inputId).value;
+            const outputElement = document.getElementById(outputId);
+
+            outputElement.innerHTML = '<span class="loading">开始处理...</span>';
+
+            // 先创建EventSource前发送POST请求
+            fetch(`/api/sse/${functionId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            }).then(() => {
+                // 创建ServerSentEvent连接
+                const eventSource = new EventSource(`/api/sse/${functionId}`);
+
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    if (data.status) {
+                        outputElement.innerHTML = `<span class="loading">${data.status}...</span>`;
+                    }
+                };
+
+                eventSource.addEventListener('chunk', function(event) {
+                    const data = JSON.parse(event.data);
+                    outputElement.textContent = data.content;
+                });
+
+                eventSource.addEventListener('error', function(event) {
+                    const data = JSON.parse(event.data);
+                    outputElement.innerHTML = `<span style="color: red;">错误：${data.error}</span>`;
+                    eventSource.close();
+                });
+
+                eventSource.addEventListener('complete', function(event) {
+                    const data = JSON.parse(event.data);
+                    if (data.status === 'completed') {
+                        // 完成后关闭连接
+                        eventSource.close();
+                    }
+                });
+
+                // 错误处理
+                eventSource.onerror = function(event) {
+                    outputElement.innerHTML += '<span style="color: red;">SSE连接出错</span>';
+                    eventSource.close();
+                };
+
+            }).catch(error => {
+                outputElement.innerHTML = `<span style="color: red;">请求错误：${error.message}</span>`;
+            });
+        }
+    </script>
+</body>
+</html>
