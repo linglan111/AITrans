@@ -5,3 +5,4 @@ redis
 eventlet  # 用于Celery的异步任务处理
 gunicorn  # 用于生产环境部署
 python-dotenv  # 用于环境变量管理
+openai  # 用于与OpenAI API交互

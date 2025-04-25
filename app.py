@@ -4,7 +4,7 @@ import json
 import time
 from celery.result import AsyncResult
 from src.tasks import celery, translate_zh_to_en_task, translate_en_to_zh_task, summarize_task
-from src.utils import (
+from src.trans import (
     translate_zh_to_en, translate_en_to_zh, summarize_text,
     stream_translate_zh_to_en, stream_translate_en_to_zh, stream_summarize
 )
