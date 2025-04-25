@@ -5,11 +5,11 @@ MODEL_CONFIG = {
     'translation': {
         'model': 'openai/gpt-4.1-nano',
         'temperature': 0.3,
-        'max_tokens': 500
+        'max_tokens': 2000
     },
     'summarization': {
         'model': 'openai/gpt-4.1-nano',
         'temperature': 0.3,
-        'max_tokens': 300
+        'max_tokens': 1000
     }
 }

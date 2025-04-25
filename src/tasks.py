@@ -10,12 +10,12 @@ celery = Celery(
     backend=REDIS_URL
 )
 
+
 @celery.task(name='translate_zh_to_en')
 def translate_zh_to_en_task(text):
     """异步中译英任务"""
-    # 模拟处理时间
-    time.sleep(2)
-    return translate_zh_to_en(text)
+    return "1111111111111111111111"
+
 
 @celery.task(name='translate_en_to_zh')
 def translate_en_to_zh_task(text):
@@ -23,6 +23,7 @@ def translate_en_to_zh_task(text):
     # 模拟处理时间
     time.sleep(2)
     return translate_en_to_zh(text)
+
 
 @celery.task(name='summarize')
 def summarize_task(text):

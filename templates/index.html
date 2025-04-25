@@ -41,9 +41,16 @@
             border-radius: 4px;
             cursor: pointer;
             margin-right: 10px;
+            margin-bottom: 5px;
         }
         button:hover {
             background-color: #45a049;
+        }
+        button.secondary {
+            background-color: #2196F3;
+        }
+        button.secondary:hover {
+            background-color: #0b7dda;
         }
         .output {
             margin-top: 15px;
@@ -55,6 +62,14 @@
         .loading {
             color: #888;
             font-style: italic;
+        }
+        .task-id {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .task-controls {
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -68,7 +83,10 @@
             <button onclick="callFunction('translate_zh_to_en', 'zhText', 'zhEnOutput', false)">同步翻译</button>
             <button onclick="callFunction('translate_zh_to_en', 'zhText', 'zhEnOutput', true)">异步翻译</button>
             <button onclick="streamFunction('translate_zh_to_en', 'zhText', 'zhEnOutput')">流式翻译</button>
-            <button onclick="sseFunction('translate_zh_to_en', 'zhText', 'zhEnOutput')">SSE流式翻译</button>
+        </div>
+        <div class="task-controls" id="zhEnTaskControls">
+            <div class="task-id">任务ID: <span id="zhEnTaskId"></span></div>
+            <button class="secondary" onclick="getTaskResult('zhEnTaskId', 'zhEnOutput')">获取异步翻译结果</button>
         </div>
         <div id="zhEnOutput" class="output">翻译结果将显示在这里...</div>
     </div>
@@ -80,7 +98,10 @@
             <button onclick="callFunction('translate_en_to_zh', 'enText', 'enZhOutput', false)">同步翻译</button>
             <button onclick="callFunction('translate_en_to_zh', 'enText', 'enZhOutput', true)">异步翻译</button>
             <button onclick="streamFunction('translate_en_to_zh', 'enText', 'enZhOutput')">流式翻译</button>
-            <button onclick="sseFunction('translate_en_to_zh', 'enText', 'enZhOutput')">SSE流式翻译</button>
+        </div>
+        <div class="task-controls" id="enZhTaskControls">
+            <div class="task-id">任务ID: <span id="enZhTaskId"></span></div>
+            <button class="secondary" onclick="getTaskResult('enZhTaskId', 'enZhOutput')">获取异步翻译结果</button>
         </div>
         <div id="enZhOutput" class="output">翻译结果将显示在这里...</div>
     </div>
@@ -92,7 +113,10 @@
             <button onclick="callFunction('summarize', 'summaryText', 'summaryOutput', false)">同步总结</button>
             <button onclick="callFunction('summarize', 'summaryText', 'summaryOutput', true)">异步总结</button>
             <button onclick="streamFunction('summarize', 'summaryText', 'summaryOutput')">流式总结</button>
-            <button onclick="sseFunction('summarize', 'summaryText', 'summaryOutput')">SSE流式总结</button>
+        </div>
+        <div class="task-controls" id="summaryTaskControls">
+            <div class="task-id">任务ID: <span id="summaryTaskId"></span></div>
+            <button class="secondary" onclick="getTaskResult('summaryTaskId', 'summaryOutput')">获取异步翻译结果</button>
         </div>
         <div id="summaryOutput" class="output">总结结果将显示在这里...</div>
     </div>
@@ -102,6 +126,12 @@
         async function callFunction(functionId, inputId, outputId, isAsync) {
             const text = document.getElementById(inputId).value;
             const outputElement = document.getElementById(outputId);
+
+            // 先隐藏任务控制区域
+            //if (isAsync) {
+            //    const taskControlId = outputId.replace('Output', 'TaskControls');
+            //    document.getElementById(taskControlId).style.display = 'none';
+            //}
 
             outputElement.innerHTML = '<span class="loading">处理中，请稍候...</span>';
 
@@ -122,10 +152,16 @@
                     }
 
                     const taskId = data.task_id;
-                    outputElement.innerHTML = '<span class="loading">任务已提交，正在等待结果...</span>';
+                    // 显示任务ID和控制按钮
+                    const taskIdElement = document.getElementById(outputId.replace('Output', 'TaskId'));
+                    taskIdElement.textContent = taskId;
+                    const taskControlElement = document.getElementById(outputId.replace('Output', 'TaskControls'));
+                    taskControlElement.style.display = 'block';
 
-                    // 轮询获取结果
-                    await pollTaskResult(taskId, outputElement);
+                    outputElement.innerHTML = '<span class="loading">任务已提交，可以点击"获取任务结果"按钮查看结果，或等待自动更新...</span>';
+
+                    // 开始轮询结果但不显示中间状态
+                    pollTaskResult(taskId, outputElement, true);
                     return;
                 } else {
                     // 同步调用
@@ -150,13 +186,15 @@
         }
 
         // 轮询任务结果
-        async function pollTaskResult(taskId, outputElement) {
+        async function pollTaskResult(taskId, outputElement, silentMode = false) {
             let attempts = 0;
             const maxAttempts = 30; // 最多轮询30次
 
             const poll = async () => {
                 if (attempts >= maxAttempts) {
-                    outputElement.innerHTML = '<span style="color: red;">获取结果超时</span>';
+                    if (!silentMode) {
+                        outputElement.innerHTML = '<span style="color: red;">获取结果超时</span>';
+                    }
                     return;
                 }
 
@@ -167,7 +205,9 @@
                     const data = await response.json();
 
                     if (data.status === 'pending') {
-                        outputElement.innerHTML = `<span class="loading">正在处理中 (${attempts})...</span>`;
+                        if (!silentMode) {
+                            outputElement.innerHTML = `<span class="loading">正在处理中 (${attempts})...</span>`;
+                        }
                         setTimeout(poll, 1000); // 1秒后再次轮询
                     } else if (data.status === 'completed') {
                         outputElement.textContent = data.result;
@@ -175,17 +215,51 @@
                         outputElement.innerHTML = `<span style="color: red;">任务失败：${data.result}</span>`;
                     }
                 } catch (error) {
-                    outputElement.innerHTML = `<span style="color: red;">轮询错误：${error.message}</span>`;
+                    if (!silentMode) {
+                        outputElement.innerHTML = `<span style="color: red;">轮询错误：${error.message}</span>`;
+                    }
                 }
             };
 
             await poll();
         }
 
+        // 手动获取任务结果
+        async function getTaskResult(taskIdElementId, outputId) {
+            const taskId = document.getElementById(taskIdElementId).textContent;
+            const outputElement = document.getElementById(outputId);
+
+            if (!taskId) {
+                outputElement.innerHTML = '<span style="color: red;">没有可用的任务ID</span>';
+                return;
+            }
+
+            outputElement.innerHTML = '<span class="loading">正在获取任务结果...</span>';
+
+            try {
+                const response = await fetch(`/api/tasks/${taskId}`);
+                const data = await response.json();
+
+                if (data.status === 'pending') {
+                    outputElement.innerHTML = '<span class="loading">任务仍在处理中，请稍后再试...</span>';
+                } else if (data.status === 'completed') {
+                    outputElement.textContent = data.result;
+                } else {
+                    outputElement.innerHTML = `<span style="color: red;">任务失败：${data.result}</span>`;
+                }
+            } catch (error) {
+                outputElement.innerHTML = `<span style="color: red;">获取结果错误：${error.message}</span>`;
+            }
+        }
+
         // 流式调用 (chunked response)
         async function streamFunction(functionId, inputId, outputId) {
             const text = document.getElementById(inputId).value;
             const outputElement = document.getElementById(outputId);
+
+            // 隐藏任务控制区域
+            const taskControlId = outputId.replace('Output', 'TaskControls');
+            document.getElementById(taskControlId).style.display = 'none';
 
             outputElement.innerHTML = '<span class="loading">开始处理...</span>';
 
@@ -231,59 +305,6 @@
             } catch (error) {
                 outputElement.innerHTML = `<span style="color: red;">错误：${error.message}</span>`;
             }
-        }
-
-        // SSE流式调用
-        function sseFunction(functionId, inputId, outputId) {
-            const text = document.getElementById(inputId).value;
-            const outputElement = document.getElementById(outputId);
-
-            outputElement.innerHTML = '<span class="loading">开始处理...</span>';
-
-            // 先创建EventSource前发送POST请求
-            fetch(`/api/sse/${functionId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text })
-            }).then(() => {
-                // 创建ServerSentEvent连接
-                const eventSource = new EventSource(`/api/sse/${functionId}`);
-
-                eventSource.onmessage = function(event) {
-                    const data = JSON.parse(event.data);
-                    if (data.status) {
-                        outputElement.innerHTML = `<span class="loading">${data.status}...</span>`;
-                    }
-                };
-
-                eventSource.addEventListener('chunk', function(event) {
-                    const data = JSON.parse(event.data);
-                    outputElement.textContent = data.content;
-                });
-
-                eventSource.addEventListener('error', function(event) {
-                    const data = JSON.parse(event.data);
-                    outputElement.innerHTML = `<span style="color: red;">错误：${data.error}</span>`;
-                    eventSource.close();
-                });
-
-                eventSource.addEventListener('complete', function(event) {
-                    const data = JSON.parse(event.data);
-                    if (data.status === 'completed') {
-                        // 完成后关闭连接
-                        eventSource.close();
-                    }
-                });
-
-                // 错误处理
-                eventSource.onerror = function(event) {
-                    outputElement.innerHTML += '<span style="color: red;">SSE连接出错</span>';
-                    eventSource.close();
-                };
-
-            }).catch(error => {
-                outputElement.innerHTML = `<span style="color: red;">请求错误：${error.message}</span>`;
-            });
         }
     </script>
 </body>

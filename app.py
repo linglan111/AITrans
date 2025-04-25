@@ -115,42 +115,5 @@ def stream_function(function_id):
     return Response(generate(), mimetype='text/event-stream')
 
 
-@app.route('/api/sse/<function_id>', methods=['POST'])
-def sse_function(function_id):
-    """流式返回功能结果 (使用SSE)"""
-    text = request.json.get('text', '')
-
-    if not text:
-        return jsonify({'success': False, 'message': 'Text is required'})
-
-    def generate():
-        yield "event: message\n"
-        yield f"data: {json.dumps({'status': 'started'})}\n\n"
-
-        if function_id == 'translate_zh_to_en':
-            for i, chunk in enumerate(stream_translate_zh_to_en(text)):
-                yield "event: chunk\n"
-                yield f"data: {json.dumps({'id': i, 'content': chunk})}\n\n"
-                time.sleep(0.1)
-        elif function_id == 'translate_en_to_zh':
-            for i, chunk in enumerate(stream_translate_en_to_zh(text)):
-                yield "event: chunk\n"
-                yield f"data: {json.dumps({'id': i, 'content': chunk})}\n\n"
-                time.sleep(0.1)
-        elif function_id == 'summarize':
-            for i, chunk in enumerate(stream_summarize(text)):
-                yield "event: chunk\n"
-                yield f"data: {json.dumps({'id': i, 'content': chunk})}\n\n"
-                time.sleep(0.1)
-        else:
-            yield "event: error\n"
-            yield f"data: {json.dumps({'error': 'Function not found'})}\n\n"
-
-        yield "event: complete\n"
-        yield f"data: {json.dumps({'status': 'completed'})}\n\n"
-
-    return Response(generate(), mimetype='text/event-stream')
-
-
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')

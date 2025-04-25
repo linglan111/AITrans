@@ -64,7 +64,8 @@ def stream_call_llm(prompt, model_config, task_type=None):
                 collected_messages += content
                 yield collected_messages
         # 如果没有收到任何内容, 报错
-        raise Exception(f"流式调用LLM API时出错: 没有接收到任何内容.")
+        if not collected_messages:
+            raise Exception(f"流式调用LLM API时出错: 没有接收到任何内容.")
     except:
         raise Exception(f"流式调用LLM API时出错: {traceback.format_exc()}")
 
